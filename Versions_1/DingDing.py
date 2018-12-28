@@ -70,7 +70,9 @@ class dingding:
         # 点击工作
         self.adbselect_work = '"%s\\adb" shell input tap %s' % (directory,config.get("position","work_position"))
         # 点击考勤打卡
-        self.adbselect_playcard = '"%s\\adb" shell input tap %s' % (directory,config.get("position","check_position"))
+        self.adbselect_check_position_card = '"%s\\adb" shell input tap %s' % (directory,config.get("position","check_position"))
+        # 点击考勤按钮
+        self.adbselect_checkposition = '"%s\\adb" shell input tap %s' % (directory,config.get("position","check_tap_position"))
         # 点击下班打卡
         self.adbclick_playcard = '"%s\\adb" shell input tap %s' % (directory,config.get("position","play_position"))
         # 设备截屏保存到sdcard
@@ -105,13 +107,13 @@ class dingding:
     @with_open_close_dingding
     def goto_work(self,minute):
         self.screencap()
-        self.sendEmail(minute)
+        #self.sendEmail(minute)
         print("打卡成功")
 
     # 打开打卡界面
     def openplaycard_interface(self):
         print("打开打卡界面")
-        operation_list = [self.adbselect_work, self.adbselect_playcard]
+        operation_list = [self.adbselect_work, self.adbselect_check_position_card,self.adbselect_playcard]
         for operation in operation_list:
             process = subprocess.Popen(operation, shell=False,stdout=subprocess.PIPE)
             process.wait()
@@ -128,7 +130,7 @@ class dingding:
             process.wait()
             time.sleep(3)
         self.screencap()
-        self.sendEmail(minute)
+        #self.sendEmail(minute)
         print("afterwork playcard success")
 
     # 截屏>> 发送到电脑 >> 删除手机中保存的截屏
@@ -232,10 +234,10 @@ def is_weekend():
 
 if __name__ == "__main__":
     # ======formal
-    scheduler.enter(0,0,incode_loop,(start_loop,random_minute(),))
-    scheduler.run()
+    #scheduler.enter(0,0,incode_loop,(start_loop,random_minute(),))
+    #scheduler.run()
     # ====test
     # dingding  = dingding(directory)
-    # dingding.goto_work(12)
+    dingding.goto_work(12)
     # ==== weekend
     # print(is_weekend())
