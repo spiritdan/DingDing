@@ -4,13 +4,9 @@ import time
 import sched
 import datetime
 import random
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.image import MIMEImage
-from email.mime.multipart import MIMEMultipart
 import configparser
 import os
-import sys
+
 
 
 
@@ -28,9 +24,8 @@ if not os.path.exists(screen_dir):
     os.makedirs(screen_dir)
 
 
-#获得当前时间时间戳
+#转换日期格式作为文件名
 now = int(time.time())
-#转换为其他日期格式,如:"%Y-%m-%d %H:%M:%S"
 timeStruct = time.localtime(now)
 strTime = time.strftime("%Y%m%d%H%M%S", timeStruct)
 #print(strTime)
@@ -40,16 +35,29 @@ strTime = time.strftime("%Y%m%d%H%M%S", timeStruct)
 def with_open_close_dingding(func):
     def wrapper(self, *args, **kwargs):
         print("打开钉钉")
-        operation_list = [self.adbpower, self.adbclear, self.adbopen_dingding]
+        boolawake=ifawake()
+        boollock=ifLock()
+
+        #判断是不是需要唤醒
+        if boolawake=='false':
+            print('手机处于休眠状态，唤醒手机，解锁手机，运行钉钉')
+            operation_list = [self.adbpower, self.adbclear, self.adbopen_dingding]
+        elif boollock=='true':
+            print("手机处于锁定状态，解锁手机，运行钉钉")
+            operation_list = [self.adbclear, self.adbopen_dingding]
+        else:
+            print("手机处于解锁状态，直接运行钉钉")
+            operation_list = [self.adbopen_dingding]
+
         for operation in operation_list:
             process = subprocess.Popen(operation, shell=False,stdout=subprocess.PIPE)
             process.wait()
         # 确保完全启动，并且加载上相应按键
         time.sleep(20)
         print("open dingding success")
-        print("打开打卡界面")
+        print("进入打卡界面")
         operation_list1 = [self.adbselect_work, self.adbselect_check_position_card]
-        #operation_list1 = [self.adbselect_work, self.adbselect_check_position_card,self.adbselect_playcard]
+
         for operation in operation_list1:
             process = subprocess.Popen(operation, shell=False,stdout=subprocess.PIPE)
             process.wait()
@@ -61,7 +69,7 @@ def with_open_close_dingding(func):
         func(self, *args, **kwargs)
 
         print("关闭钉钉")
-        operation_list2 = [self.adbback_index, self.adbkill_dingding, self.adbpower]
+        operation_list2 = [self.adbkill_dingding, self.adbpower]
         for operation in operation_list2:
             process = subprocess.Popen(operation, shell=False,stdout=subprocess.PIPE)
             process.wait()
@@ -74,8 +82,6 @@ class dingding:
     # 初始化，设置adb目录
     def __init__(self,directory):
         self.directory = directory
-        #屏幕状态
-        self.adbawake='"%s\\adb" shell dumpsys window policy|find /I "mAwake"'% directory
         # 点亮屏幕
         self.adbpower = '"%s\\adb" shell input keyevent 26' % directory
         # 滑屏解锁
@@ -86,13 +92,13 @@ class dingding:
         self.adbkill_dingding = '"%s\\adb" shell am force-stop com.alibaba.android.rimet'% directory
         # 返回桌面
         self.adbback_index = '"%s\\adb" shell input keyevent 3' % directory
-        # 点击工作
+        # 点击工作标签
         self.adbselect_work = '"%s\\adb" shell input tap %s' % (directory,config.get("position","work_position"))
-        # 点击考勤打卡
+        # 点击考勤打卡标签
         self.adbselect_check_position_card = '"%s\\adb" shell input tap %s' % (directory,config.get("position","check_tap_position"))
         # 点击考勤按钮
-        self.adbselect_checkposition = '"%s\\adb" shell input tap %s' % (directory,config.get("position","check_tap_position"))
-        # 点击下班打卡
+        self.adbselect_checkposition = '"%s\\adb" shell input tap %s' % (directory,config.get("position","check_position"))
+        # 点击下班打卡按钮
         self.adbclick_playcard = '"%s\\adb" shell input tap %s' % (directory,config.get("position","play_position"))
         # 设备截屏保存到sdcard
         self.adbscreencap = '"%s\\adb" shell screencap -p sdcard/screen%s.png' % (directory,strTime)
@@ -100,72 +106,39 @@ class dingding:
         self.adbpull = '"%s\\adb" pull sdcard/screen%s.png %s' % (directory,strTime,screen_dir)
         # 删除设备截屏
         self.adbrm_screencap = '"%s\\adb" shell rm -r sdcard/screen%s.png' % (directory,strTime)
+        #截屏文件名
         self.filename = 'screen{0}.png'.format(strTime)
 
-    # 点亮屏幕 》》解锁 》》打开钉钉
-    def open_dingding(self):
-        #if ifawake()=='false':
-        operation_list = [self.adbpower,self.adbclear,self.adbopen_dingding]
-        for operation in operation_list:
-            process = subprocess.Popen(operation, shell=False,stdout=subprocess.PIPE)
-            process.wait()
-        # 确保完全启动，并且加载上相应按键
-        time.sleep(10)
-        print("open dingding success")
-
-
-    # 返回桌面 》》 退出钉钉 》》 手机黑屏
-    def close_dingding(self):
-        operation_list = [self.adbback_index,self.adbkill_dingding,self.adbpower]
-        for operation in operation_list:
-            process = subprocess.Popen(operation, shell=False,stdout=subprocess.PIPE)
-            process.wait()
-        print("kill dingding success")
-
-
-    # 上班(极速打卡)
+    # 上班打卡
     @with_open_close_dingding
     def goto_work(self,minute):
         #点击上班按钮
+        print('点击上班按钮')
         #operation_list = [self.adbselect_checkposition]
-        #返回桌面
-        operation_list = [self.adbback_index]
-        print('返回桌面')
+        operation_list = [self.adbselect_check_position_card]
+
         for operation in operation_list:
             process = subprocess.Popen(operation, shell=False, stdout=subprocess.PIPE)
             process.wait()
             time.sleep(3)
         self.screencap()
-        #self.sendEmail(minute)
         print("打卡成功")
-        return 'screen%s.png' % strTime
 
-    # 打开打卡界面
-    def openplaycard_interface(self):
-        print("打开打卡界面")
-        operation_list = [self.adbselect_work, self.adbselect_check_position_card,self.adbselect_playcard]
-        for operation in operation_list:
-            process = subprocess.Popen(operation, shell=False,stdout=subprocess.PIPE)
-            process.wait()
-            time.sleep(2)
-        time.sleep(30)
-        print("open playcard success")
+
 
     # 下班
     @with_open_close_dingding
     def after_work(self,minute):
         #点击下班按钮
+        print('点击下班按钮')
+        operation_list = [self.adbselect_check_position_card]
         #operation_list = [self.adbclick_playcard]
-        #返回桌面
-        operation_list = [self.adbback_index]
-        print('返回桌面')
         for operation in operation_list:
             process = subprocess.Popen(operation, shell=False,stdout=subprocess.PIPE)
             process.wait()
             time.sleep(3)
 
         self.screencap()
-        #self.sendEmail(minute)
         print("afterwork playcard success")
 
 
@@ -185,75 +158,29 @@ def ifawake():
     for line in process.stdout.readlines():
         ##blow for pycharm and cygwin show chinese#
         output = line.decode('utf-8')
-        ifAwake = output.split('=')[1]
-        print(output)
-    return ifAwake
+        bool_Awake = output.split('=')[-1].strip()
+        #print(output)
+    return bool_Awake
 
-# 随机打卡时间段
+def ifLock():
+    #True为锁屏 false为已解锁
+    adbawake = '"%s\\adb" shell dumpsys window policy|find /I "isStatusBarKeyguard"'% directory
+
+    process = subprocess.Popen(adbawake, shell=True, stdout=subprocess.PIPE)
+    process.wait()
+    for line in process.stdout.readlines():
+        ##blow for pycharm and cygwin show chinese#
+        output = line.decode('utf-8')
+        bool_lock = output.split('=')[-1].strip()
+        #print(bool_lock)
+    return bool_lock
+
+# 随机打卡时间段(待完善)
 def random_minute():
     return random.randint(30,50)
 
-# 包装循环函数，传入随机打卡时间点
-def incode_loop(func,minute):
-    """
-    包装start_loop任务调度函数，主要是为了传入随机分钟数。保证在不打卡的情况下能保持分钟数不变。
-    :param func: star_loop
-    :param minute: 随机分钟数
-    :return: None
-    """
-    print("邮件接收地址"+receive)
-    # 判断时间当超过上班时间则打下班卡。否则则打上班卡。
-    if datetime.datetime.now().hour >=go_hour and datetime.datetime.now().hour <back_hour:
-        # 用来分类上班和下班。作为参数传入任务调度
-        hourtype = 1
-        print("下次将在", str(back_hour), ":", str(minute), "打卡")
-    else:
-        hourtype = 2
-        print("下次将在", str(go_hour), ":", str(minute), "打卡")
-    #执行任务调度函数
-    func(hourtype,minute)
-
-
-# 任务调度
-def start_loop(hourtype,minute):
-    """
-    每次循环完成，携带生成的随机分钟数来再次进行循环，当打卡后，再重新生成随机数
-    :param hourtype: 设置的上班时间点
-    :param minute: 随机生成的分钟数（30-55）
-    :return: None
-    """
-    now_time = datetime.datetime.now()
-    now_hour = now_time.hour
-    now_minute = now_time.minute
-    # 上班，不是周末（双休），小时对应，随机分钟对应
-    if hourtype == 2 and now_hour == go_hour and now_minute == minute and is_weekend():
-        random_time = random_minute()
-        dingding(directory).goto_work(random_time)
-        scheduler.enter(0,0,incode_loop,(start_loop,random_time,))
-    if hourtype == 1 and now_hour == back_hour and now_minute == minute and is_weekend():
-        random_time = random_minute()
-        dingding(directory).after_work(random_time)
-        scheduler.enter(0, 0, incode_loop,(start_loop,random_time,))
-    else:
-        print(now_hour,':',now_minute)
-        scheduler.enter(60,0,start_loop,(hourtype,minute,))
-
-# 是否是周末
-def is_weekend():
-    """
-    :return: if weekend return False else return True
-    """
-    now_time = datetime.datetime.now().strftime("%w")
-    if now_time == "6" or now_time == "0":
-        return False
-    else:
-        return True
-
 
 if __name__ == "__main__":
-    # ======formal
-    #scheduler.enter(0,0,incode_loop,(start_loop,random_minute(),))
-    #scheduler.run()
     # ====test
     dingding  = dingding(directory)
     dingding.goto_work(0)
