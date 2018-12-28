@@ -1,0 +1,15 @@
+1，需要安装adb，下载地址：
+https://adb.clockworkmod.com/
+可以把ADB路径加入环境变量，便于操作
+C:\Program Files (x86)\ClockworkMod\Universal Adb Driver
+2，手机需要打开开发者模式
+3，关于手机上坐标定位
+截屏
+adb shell screencap -p sdcard/screen.png
+把截屏发送到本地
+adb shell pull sdcard/screen.png d:\\screen.png
+用mspaint打开图片,用光标定位按键的位置，详见图片sample01和sample02
+4，这里没有考虑手机加密码的情况，原理是一样的。
+5，代码调试时候把点击打卡按钮注释了，只print了操作，需要改回来才能打卡
+6,休假日没有合适的免费接口，可以考虑直接从爬一份：https://wannianrili.51240.com
+7,截图不要高清！微信只支持发100k左右的图片，格式必须png

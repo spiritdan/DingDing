@@ -126,7 +126,7 @@ class dingding:
 
 
 
-    # 下班
+    # 下班 
     @with_open_close_dingding
     def after_work(self,minute):
         #点击下班按钮
